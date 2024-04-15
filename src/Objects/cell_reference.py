@@ -21,6 +21,12 @@ class CellReference:
     def column_number(self):
         return openpyxl.utils.column_index_from_string(self.column_letter)
 
+    def update_column_letter(self, new_letter):
+        self.column_letter = new_letter
+
+    def update_row_number(self, new_number):
+        self.row_number = int(new_number)
+
     def __str__(self):
         if self.sheet_name:
             return f"'{self.sheet_name}'!{self.column_letter}{self.row_number}"

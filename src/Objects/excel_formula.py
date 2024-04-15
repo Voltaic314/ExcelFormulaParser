@@ -123,8 +123,13 @@ class ExcelFormula:
     def update_cell_reference(self, old_ref, new_ref):
         def update(data):
             if isinstance(data, dict):
-                if 'cell_reference' in data and data['cell_reference'] == old_ref:
-                    data['cell_reference'] = new_ref
+                if 'cell_reference' in data:
+                    cell = CellReference(data['cell_reference'])
+                    if str(cell) == old_ref:
+                        new_cell = CellReference(new_ref)  # Create a new CellReference with the new reference
+                        cell.update_column_letter(new_cell.column_letter)
+                        cell.update_row_number(new_cell.row_number)
+                        data['cell_reference'] = str(cell)  # Update the dictionary with new reference string
                 for key in data:
                     update(data[key])
             elif isinstance(data, list):
@@ -133,8 +138,7 @@ class ExcelFormula:
         update(self.parsed_formula)
 
     def __str__(self):
-        return json.dumps(self.parsed_formula, indent=4)
-
+        return self.reconstruct_formula()
 
 if __name__ == "__main__":
     # Example usage
