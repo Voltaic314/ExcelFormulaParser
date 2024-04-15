@@ -2,7 +2,15 @@ import re
 import json
 from cell_range import CellRange
 from cell_reference import CellReference
-from excel_function import ExcelFunction
+
+'''
+## TODO: This code should be utilizing the logic from the 
+ExcelFunction class but I am too tired to know how to properly implement
+it right now. If it ain't broke then don't fix it! haha. But seriously...
+This should be reworked a little to support that class otherwise it's just
+kinda useless sitting there.
+'''
+
 
 class ExcelFormula:
     def __init__(self, input_data):
@@ -94,9 +102,39 @@ class ExcelFormula:
         elif 'constant' in json_data:
             return json_data['constant']
         return ''
+    
+
+    def _list_items(self, data, item_type, as_objects=False):
+        result = []
+        if isinstance(data, dict):
+            if item_type in data:
+                if item_type == "cell_reference" and as_objects:
+                    # Return actual CellReference objects
+                    result.append(CellReference(data[item_type]))
+                else:
+                    result.append(data[item_type])
+            for key in data:
+                result.extend(self._list_items(data[key], item_type, as_objects))
+        elif isinstance(data, list):
+            for item in data:
+                result.extend(self._list_items(item, item_type, as_objects))
+        return result
+
+    def update_cell_reference(self, old_ref, new_ref):
+        def update(data):
+            if isinstance(data, dict):
+                if 'cell_reference' in data and data['cell_reference'] == old_ref:
+                    data['cell_reference'] = new_ref
+                for key in data:
+                    update(data[key])
+            elif isinstance(data, list):
+                for item in data:
+                    update(item)
+        update(self.parsed_formula)
 
     def __str__(self):
         return json.dumps(self.parsed_formula, indent=4)
+
 
 if __name__ == "__main__":
     # Example usage
