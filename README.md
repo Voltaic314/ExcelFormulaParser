@@ -1,4 +1,4 @@
-# Excel_Helper_Framework
+# ExcelFormulaParser
  This project aims to use a combination of openpyxl and 
  regex string matching to structure and organize spreadsheets. 
 
