@@ -1,24 +1,37 @@
-'''
-This houses the Excel Function class which basically just 
-tells you the function's name and its list of arguments given. 
-
-## TODO: I really want to add a function type / category feature that can classify
-the function type and what data types are valid for arguments. Some functions in 
-excel require you to pass in specific kinds of data types into specific positional arguments.
-So it would be really nice to be able to encapsulate this logic into python somehow.
-For now, the logical structure of this OOP class will just be a bit more basic. lol
-'''
 import re
 
 class ExcelFunction:
-    def __init__(self, function_string):
-        # Extract function name and argument string
-        match = re.match(r"(\w+)\((.*)\)$", function_string)
-        if not match:
-            raise ValueError("Invalid function format")
+    pattern = r"([a-zA-Z]+)\((.*)\)$"
 
-        self.name, args_str = match.groups()
-        self.arguments = self.parse_arguments(args_str)
+    @staticmethod
+    def is_function_string(function_string):
+        match = re.match(ExcelFunction.pattern, function_string)
+        if not match:
+            return False
+        # find all "(" in the string and make sure the previous character is a letter
+        balance = 0
+        for index, character in enumerate(function_string):
+            previous_character = function_string[index-1] if index else ''
+            if character == "(":
+                balance += 1
+            elif character == ")":
+                balance -= 1
+            
+            if character == "(" and not previous_character.isalpha() and balance == 1:
+                return False
+        if function_string.count("(") != function_string.count(")"):
+            return False
+        if not function_string.endswith(")"):
+            return False
+        return True
+    
+    def __init__(self, function_string):
+        match = re.match(ExcelFunction.pattern, str(function_string))
+        self.match = match
+        if not bool(self.match):
+            raise ValueError("Invalid function format")
+        self.name = match.group(1)
+        self.arguments = self.parse_arguments(match.group(2))
 
     def parse_arguments(self, args_str):
         args = []
@@ -35,11 +48,28 @@ class ExcelFunction:
                     current_arg = []
             else:
                 current_arg.append(char)
-        if current_arg:  # Append the last argument
+        if current_arg:  # Append the last argument if present
             args.append(''.join(current_arg).strip())
-        return args
+
+        if brackets != 0:  # Ensure parentheses are balanced
+            raise ValueError("Unbalanced parentheses in arguments")
+
+        # Return ExcelFunction objects for nested functions
+        return [ExcelFunction(arg) if ExcelFunction.is_function_string(arg) else arg for arg in args]
 
     def __str__(self):
         args_str = ', '.join(str(arg) for arg in self.arguments)
         return f"{self.name}({args_str})"
 
+
+if __name__ == "__main__":
+    invalid_func_strs = ['INVALID(1, 2, 3', "(1, 2, 3)", 
+                         "MISSINGPARENTHESIS", "SUM((1, 2))", 
+                         "SUM(1, 2, 3)"]
+    
+    for func_str in invalid_func_strs:
+        try:
+            function = ExcelFunction(func_str)
+            print(f"Successfully created function: {function}")
+        except ValueError as e:
+            print(f"Error creating function {func_str}: {e}")

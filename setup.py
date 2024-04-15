@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="Excel-Helper-Framework",
+    name="ExcelFormulaParser",
     version="1.0.0",
     packages=find_packages(where="src"),  # Tells setuptools to package any Python packages found in src
     package_dir={"": "src"},  # Tells setuptools that the packages are under src directory
