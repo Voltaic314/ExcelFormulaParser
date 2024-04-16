@@ -1,35 +1,64 @@
 import re
-from Objects.expression import Expression
-from Objects.excel_function import ExcelFunction
-from Objects.constant import Constant
+import json
 from Objects.cell_reference import CellReference
+from Objects.excel_function import ExcelFunction
+from Objects.cell_range import CellRange
+from Objects.expression import Expression  # Import the Expression class
 
 class FormulaParser:
-    def __init__(self, formula: str):
-        self.formula = formula
-        self.function_pattern = re.compile(ExcelFunction.pattern)
+    operator_pattern = r'(\+|\-|\*|\/)'  # Regex pattern for splitting by operators
 
-    def classify_component(self, component):
-        if Expression.is_valid_expression(component):
-            return {"type": "expression", "value": component}
-        elif ExcelFunction.is_function_string(component):
-            return {"type": "function", "value": component}
-        elif Constant.is_valid_constant(component):
-            return {"type": "constant", "value": component}
-        elif CellReference.is_valid_reference(component):
-            return {"type": "reference", "value": component}
-        else:
-            return {"type": "unknown", "value": component}
+    def __init__(self, formula_str):
+        if not formula_str.startswith('='):
+            raise ValueError("Formula must start with an '=' sign.")
+        self.formula = formula_str[1:]  # Skip the '=' sign for internal parsing
 
-    def parse_formula(self):
-        expression = Expression(self.formula)
-        components = expression.components
-        classified_components = {i: self.classify_component(comp) for i, comp in enumerate(components)}
-        return classified_components
+    def parse(self):
+        return self.parse_expression(self.formula)
+
+    def parse_expression(self, expr):
+        expr = str(expr).strip()
+
+        # Delegate function parsing to ExcelFunction if it matches the function pattern
+        if ExcelFunction.is_function_string(expr):
+            func = ExcelFunction(expr)
+            return {
+                "function": func.name, 
+                "arguments": [func.arguments]
+            }
+
+        # Utilize the Expression class to handle and validate expressions
+        if Expression.is_valid_expression(expr):
+            expression_obj = Expression(expr)
+            return {
+                "expression": [self.parse_expression(part) for part in expression_obj.components]
+            }
+
+        # Parse ranges and references using the respective classes
+        if CellRange.is_valid_range(expr):
+            return {"cell_range": str(CellRange(expr))}
+        
+        if CellReference.is_valid_reference(expr):
+            return {"cell_reference": str(CellReference(expr))}
+        
+        if expr in ['+', '-', '*', '/']:
+            return {"operator": expr}
+        
+        # Treat any other type as a constant
+        return {"constant": expr}
+
+    def __str__(self):
+        # This provides a basic string representation of the parsed formula as JSON
+        return str(self.parse())
+    
+
+    def __repr__(self):
+        return json.dumps(str(self), indent=4)
+
 
 # Example usage of the FormulaParser class
 if __name__ == "__main__":
-    formula = "=A1 + 5"
+    formula = "=SUM(A1, MAX(B1, C1 + D1))"
     formula_parser = FormulaParser(formula)
-    parsed_output = formula_parser.parse_expression(formula)
+    parsed_output = formula_parser.parse()
     print(parsed_output)  # Should show components like ['A1', '+', '5']

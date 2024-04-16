@@ -18,12 +18,21 @@ class Expression:
     
     @staticmethod
     def is_valid_expression(expr):
-        # Check if parentheses are balanced
+        # Ensure the parentheses are balanced
         if not Expression.has_balanced_parentheses(expr):
             return False
-        # Check if there's at least one operator
-        if not re.compile(Expression.operator_pattern).search(expr):
+        
+        # Check for the presence of at least one arithmetic operator
+        if not any(op in expr for op in ['+', '-', '*', '/']):
             return False
+
+        # Split the expression by operators and check if there are valid elements around each operator
+        parts = re.split(r'[\+\-\*/]', expr)
+        parts = [part for part in parts if part]
+        if len(parts) < 2:
+            return False  # Need at least two operands around an operator
+
+        # Further validation can be added here to ensure each part is a valid number, reference, or sub-expression
         return True
 
     @staticmethod
@@ -34,7 +43,14 @@ class Expression:
         return input_string
 
     def __init__(self, expression):
-        self.expression = self.extract_expression(expression)
+        
+        if "(" in expression and ")" in expression:
+            if not self.has_balanced_parentheses(expression):
+                raise ValueError("Unbalanced parentheses in expression")
+            self.expression = self.extract_expression(expression)
+        else:
+            self.expression = expression
+
         self.components = self.split_expression(self.expression)
 
     def split_expression(self, expr):
