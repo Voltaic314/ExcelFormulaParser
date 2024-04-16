@@ -1,5 +1,5 @@
 import pytest
-from Objects import CellRange
+from src.Objects.cell_range import CellRange
 
 class TestCellRange:
     def test_valid_range_initialization(self):

@@ -1,6 +1,8 @@
 import re
 import json
-from Objects import CellRange, CellReference, ExcelFunction
+from Objects.cell_reference import CellReference
+from Objects.excel_function import ExcelFunction
+from Objects.cell_range import CellRange
 
 '''
 ## TODO: This code should be utilizing the logic from the 
@@ -11,8 +13,7 @@ kinda useless sitting there.
 '''
 
 class ExcelFormula:
-    
-    # this really needs further work to be useful, but for our internal purposes it should be okay.
+    # Static method to verify if the string is a valid formula
     @staticmethod
     def is_valid_formula(formula_str):
         return isinstance(formula_str, str) and formula_str.startswith('=')
@@ -24,46 +25,49 @@ class ExcelFormula:
             self.original_formula = input_data
             self.parsed_formula = self.parse_expression(input_data[1:])  # Skip the '='
         elif isinstance(input_data, dict):
-            self.original_formula = None  # No original formula string
+            self.original_formula = None
             self.parsed_formula = input_data
 
     def parse_expression(self, expr):
-        expr = str(expr).strip()
+        expr = expr.strip()
 
-        # Check for a function pattern
+        # Delegate function parsing to ExcelFunction if it matches the function pattern
         if ExcelFunction.is_function_string(expr):
             func = ExcelFunction(expr)
-            args = func.arguments
-            return {"function": func.name, "arguments": [self.parse_expression(arg) for arg in func.arguments]}
+            return {
+                "function": func.name, 
+                "arguments": [self.parse_expression(arg) for arg in func.arguments]
+            }
         
-        # Check for arithmetic operations
+        # If the expression includes operators, parse it as an expression
         if any(op in expr for op in ['+', '-', '*', '/']):
             return {"expression": self.parse_operators(expr)}
         
-        # Check for a cell range
+        # Parse ranges and references using the respective classes
         if CellRange.is_valid_range(expr):
-            return {"cell_range": str(CellRange(str(expr)))}
+            return {"cell_range": str(CellRange(expr))}
         
-        # Check for a cell reference
         if CellReference.is_valid_reference(expr):
-            return {"cell_reference": str(CellReference(str(expr)))}
+            return {"cell_reference": str(CellReference(expr))}
         
-        # Default to constant if no other patterns match
-        return {"constant": str(expr)}
+        # Treat any other type as a constant
+        return {"constant": expr}
 
     def parse_operators(self, expr):
-        parts = re.split(r'(\+|\-|\*|/)', str(expr))
+        # Use regular expressions to split the expression by operators, respecting spaces
+        parts = re.split(r'(\s*[+\-*/]\s*)', expr)
         processed_parts = []
-        
-        parts = [part for part in parts if part not in ['', ' ', '(', ')'] and part is not None]
+
         for part in parts:
             part = part.strip()
             if part in ['+', '-', '*', '/']:
-                processed_parts.append({"operator": part})
+                processed_parts.append({"operator": part.strip()})
             elif re.match(r"^\d+$", part):
                 processed_parts.append({"constant": part})
             else:
-                processed_parts.append({"cell_reference": str(CellReference(part))})
+                # Deeper parsing of non-numeric, non-operator parts
+                processed_parts.append(self.parse_expression(part))
+
         return processed_parts
 
     def to_dict(self):
@@ -73,10 +77,13 @@ class ExcelFormula:
         return f"={self._reconstruct(self.parsed_formula)}"
 
     def _reconstruct(self, json_data):
-        if isinstance(json_data, ExcelFunction):
-            return str(json_data)
-        elif 'expression' in json_data:
-            return ' '.join(self._reconstruct(part) for part in json_data['expression'])
+        if isinstance(json_data, dict):
+            if 'function' in json_data:
+                func_str = json_data['function'] + '(' + ', '.join(self._reconstruct(arg) for arg in json_data['arguments']) + ')'
+                return func_str
+            if 'expression' in json_data:
+                return ' '.join(self._reconstruct(part) for part in json_data['expression'])
+            return json_data.get('constant', json_data.get('cell_reference', json_data.get('cell_range', '')))
         return json_data
 
     def __str__(self):

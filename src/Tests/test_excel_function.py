@@ -1,5 +1,5 @@
 import pytest
-from Objects import ExcelFunction
+from Objects.excel_function import ExcelFunction
 
 class TestExcelFunction:
     

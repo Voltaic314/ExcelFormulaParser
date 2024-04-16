@@ -1,11 +1,11 @@
 import pytest
-from Objects import CellReference
+from Objects.cell_reference import CellReference
 
 class TestCellReference:
     def test_valid_cell_references(self):
         # Valid references with and without sheet names
         valid_refs = [
-            "A1", "Z999", "'Sheet1'!A1", "'Sheet1'!Z999", ""
+            "A1", "Z999", "'Sheet1'!A1", "'Sheet1'!Z999"
         ]
         for ref in valid_refs:
             cell = CellReference(ref)
@@ -13,7 +13,7 @@ class TestCellReference:
 
     def test_invalid_cell_references(self):
         # Invalid references
-        invalid_refs = ["1A", "AA", "A0", "ZZZ", "'SheetOne'!A-1"]
+        invalid_refs = ["1A", "AA", "A0", "ZZZ", "'SheetOne'!A-1", ""]
         for ref in invalid_refs:
             with pytest.raises(ValueError):
                 CellReference(ref)

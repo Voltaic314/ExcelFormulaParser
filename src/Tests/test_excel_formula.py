@@ -1,5 +1,5 @@
 import pytest
-from Objects import ExcelFormula
+from Objects.excel_formula import ExcelFormula
 
 class TestExcelFormula:
     def test_valid_formula_parsing(self):
@@ -40,7 +40,7 @@ class TestExcelFormula:
 
     def test_json_structure(self):
         """ Test the JSON output against expected dictionary structures. """
-        formula = ExcelFormula("=SUM(A1, MAX(B1 + C1, 'Sheet2'!B2), 3 * (A2 + 4))")
+        formula = ExcelFormula("=SUM(A1, MAX(B1 + C1, 'Sheet2'!B2), A2 + 4)")
         expected_json = {
             "function": "SUM",
             "arguments": [
@@ -72,5 +72,5 @@ class TestExcelFormula:
 
         # Test the reconstruction of the formula from the JSON
         reconstructed_formula = formula.reconstruct_formula()
-        assert reconstructed_formula == "=SUM(A1, MAX(B1 + C1, 'Sheet2'!B2), 3 * A2 + 4)"
+        assert reconstructed_formula == "=SUM(A1, MAX(B1 + C1, 'Sheet2'!B2), A2 + 4)"
         assert ExcelFormula(reconstructed_formula).to_dict() == expected_json

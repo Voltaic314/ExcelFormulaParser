@@ -1,42 +1,24 @@
 import re
+from Objects.expression import Expression
 
-class ExcelFunction:
-    pattern = r"([a-zA-Z]+)\((.*)\)$"
+
+class ExcelFunction(Expression):
+    pattern = r"([a-zA-Z_]+)\((.*)\)$"  # Function name pattern
 
     @staticmethod
     def is_function_string(function_string):
-        match = re.match(ExcelFunction.pattern, function_string)
-        if not match:
-            return False
-        # find all "(" in the string and make sure the previous character is a letter
-        balance = 0
-        for index, character in enumerate(function_string):
-            previous_character = function_string[index-1] if index else ''
-            if character == "(":
-                balance += 1
-            elif character == ")":
-                balance -= 1
-            
-            if character == "(" and not previous_character.isalpha() and balance == 1:
-                return False
-        if function_string.count("(") != function_string.count(")"):
-            return False
-        if not function_string.endswith(")"):
-            return False
-        return True
+        return bool(re.fullmatch(ExcelFunction.pattern, function_string.strip()))
     
     def __init__(self, function_string):
-        match = re.match(ExcelFunction.pattern, str(function_string))
-        self.match = match
-        if not bool(self.match):
+        if not ExcelFunction.is_function_string(function_string):
             raise ValueError("Invalid function format")
-        self.name = match.group(1)
-        self.arguments = self.parse_arguments(match.group(2))
+        name, args_str = re.match(ExcelFunction.pattern, function_string.strip()).groups()
+        super().__init__(args_str)
+        self.name = name
+        self.arguments = self.parse_arguments(self.expression)
 
     def parse_arguments(self, args_str):
-        args = []
-        brackets = 0
-        current_arg = []
+        args, brackets, current_arg = [], 0, []
         for char in args_str:
             if char == '(':
                 brackets += 1
@@ -44,22 +26,28 @@ class ExcelFunction:
                 brackets -= 1
             if char == ',' and brackets == 0:
                 if current_arg:
-                    args.append(''.join(current_arg).strip())
+                    arg = ''.join(current_arg).strip()
+                    if not self.is_valid_expression(arg):
+                        raise ValueError(f"Invalid argument format: {arg}")
+                    args.append(arg)
                     current_arg = []
             else:
                 current_arg.append(char)
-        if current_arg:  # Append the last argument if present
-            args.append(''.join(current_arg).strip())
+        if current_arg:
+            arg = ''.join(current_arg).strip()
+            if not self.is_valid_expression(arg):
+                raise ValueError(f"Invalid argument format: {arg}")
+            args.append(arg)
 
-        if brackets != 0:  # Ensure parentheses are balanced
+        if brackets != 0:
             raise ValueError("Unbalanced parentheses in arguments")
-
-        # Return ExcelFunction objects for nested functions
-        return [ExcelFunction(arg) if ExcelFunction.is_function_string(arg) else arg for arg in args]
+        
+        return args
 
     def __str__(self):
         args_str = ', '.join(str(arg) for arg in self.arguments)
         return f"{self.name}({args_str})"
+
 
 
 if __name__ == "__main__":
