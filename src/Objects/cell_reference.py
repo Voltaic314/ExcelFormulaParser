@@ -1,21 +1,23 @@
 import re
-import openpyxl
+from openpyxl.utils import column_index_from_string
 
 class CellReference:
     pattern = r"(?:'([^']+)'!)?([A-Z]+)(\d+)$"
 
     @staticmethod
     def is_valid_reference(cell_ref):
+        """Check if the provided cell reference is valid."""
         if not cell_ref:
             return False
-        # Checks if the cell reference is valid
         match = re.match(CellReference.pattern, cell_ref)
         return bool(match) or isinstance(cell_ref, CellReference)
 
     def __init__(self, cell_ref):
-        self.parse_cell_ref(cell_ref)  # Call parsing directly in constructor
+        """Initialize the CellReference instance by parsing the provided reference."""
+        self.parse_cell_ref(cell_ref)
 
     def parse_cell_ref(self, cell_ref):
+        """Parse the cell reference string and set the object attributes."""
         valid = CellReference.is_valid_reference(cell_ref)
         if not valid:
             raise ValueError(f"Invalid cell reference: {cell_ref}")
@@ -28,11 +30,11 @@ class CellReference:
 
     @property
     def column_number(self):
-        # Converts the column letter to a number
-        return openpyxl.utils.column_index_from_string(self.column_letter)
+        """Convert the column letter to a number using openpyxl's utility."""
+        return column_index_from_string(self.column_letter)
 
     def to_dict(self):
-        # Creates dictionary representation of the cell reference
+        """Create a dictionary representation of the cell reference."""
         return {
             "cell_reference": {
                 "sheet_name": self.sheet_name,
@@ -43,19 +45,19 @@ class CellReference:
         }
 
     def update_column_letter(self, new_letter):
-        # Updates the column letter of the cell reference
+        """Update the column letter of the cell reference."""
         if not new_letter.isalpha():
             raise ValueError("Invalid column letter")
         self.column_letter = new_letter
 
     def update_row_number(self, new_number):
-        # Updates the row number of the cell reference
+        """Update the row number of the cell reference."""
         if not isinstance(new_number, int) or new_number <= 0:
             raise ValueError("Invalid row number")
         self.row_number = new_number
 
     def __str__(self):
-        # String representation of the cell reference,
+        """String representation of the cell reference."""
         return f"'{self.sheet_name}'!{self.column_letter}{self.row_number}" if self.sheet_name else f"{self.column_letter}{self.row_number}"
 
 if __name__ == "__main__":

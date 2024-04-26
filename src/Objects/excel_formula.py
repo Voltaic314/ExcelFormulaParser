@@ -4,14 +4,6 @@ from Objects.cell_reference import CellReference
 from Objects.excel_function import ExcelFunction
 from Objects.cell_range import CellRange
 
-'''
-## TODO: This code should be utilizing the logic from the 
-ExcelFunction class but I am too tired to know how to properly implement
-it right now. If it ain't broke then don't fix it! haha. But seriously...
-This should be reworked a little to support that class otherwise it's just
-kinda useless sitting there.
-'''
-
 class ExcelFormula:
     # Static method to verify if the string is a valid formula
     @staticmethod
@@ -29,14 +21,14 @@ class ExcelFormula:
             self.parsed_formula = input_data
 
     def parse_expression(self, expr):
-        expr = expr.strip()
+        expr = expr.strip() if isinstance(expr, str) else expr
 
         # Delegate function parsing to ExcelFunction if it matches the function pattern
         if ExcelFunction.is_function_string(expr):
             func = ExcelFunction(expr)
             return {
                 "function": func.name, 
-                "arguments": [self.parse_expression(arg) for arg in func.arguments]
+                "arguments": [func.args]
             }
         
         # If the expression includes operators, parse it as an expression
@@ -54,14 +46,15 @@ class ExcelFormula:
         return {"constant": expr}
 
     def parse_operators(self, expr):
+        expr = expr.strip() if isinstance(expr, str) else expr
         # Use regular expressions to split the expression by operators, respecting spaces
         parts = re.split(r'(\s*[+\-*/]\s*)', expr)
         processed_parts = []
 
         for part in parts:
-            part = part.strip()
+            part = part.strip() if isinstance(part, str) else part
             if part in ['+', '-', '*', '/']:
-                processed_parts.append({"operator": part.strip()})
+                processed_parts.append({"operator": part})
             elif re.match(r"^\d+$", part):
                 processed_parts.append({"constant": part})
             else:
@@ -100,39 +93,39 @@ if __name__ == "__main__":
     except ValueError as e:
         print(e)
 
-    try:
-        # Pass a formula string
-        formula_instance = ExcelFormula("=SUM(A1, MAX(B1 + C1, 'Sheet2'!B2), 3 * (A2 + 4))")
-        print(formula_instance.reconstruct_formula())  # Reconstruct the formula from parsed JSON
+    # try:
+    #     # Pass a formula string
+    #     formula_instance = ExcelFormula("=SUM(A1, MAX(B1 + C1, 'Sheet2'!B2), 3 * (A2 + 4))")
+    #     print(formula_instance.reconstruct_formula())  # Reconstruct the formula from parsed JSON
 
-        # Pass JSON directly
-        expected_json = {
-            "function": "SUM",
-            "arguments": [
-                {"cell_reference": "A1"},
-                {
-                    "function": "MAX",
-                    "arguments": [
-                        {
-                            "expression": [
-                                {"cell_reference": "B1"},
-                                {"operator": "+"},
-                                {"cell_reference": "C1"}
-                            ]
-                        },
-                        {"constant": "'Sheet2'!B2"}
-                    ]
-                },
-                {
-                    "expression": [
-                        {"cell_reference": "A2"},
-                        {"operator": "+"},
-                        {"constant": "4"}
-                    ]
-                }
-            ]
-        }
-        json_instance = ExcelFormula(expected_json)
-        print(json_instance.reconstruct_formula())  # Should output the same reconstructed formula
-    except ValueError as e:
-        print(e)
+    #     # Pass JSON directly
+    #     expected_json = {
+    #         "function": "SUM",
+    #         "arguments": [
+    #             {"cell_reference": "A1"},
+    #             {
+    #                 "function": "MAX",
+    #                 "arguments": [
+    #                     {
+    #                         "expression": [
+    #                             {"cell_reference": "B1"},
+    #                             {"operator": "+"},
+    #                             {"cell_reference": "C1"}
+    #                         ]
+    #                     },
+    #                     {"constant": "'Sheet2'!B2"}
+    #                 ]
+    #             },
+    #             {
+    #                 "expression": [
+    #                     {"cell_reference": "A2"},
+    #                     {"operator": "+"},
+    #                     {"constant": "4"}
+    #                 ]
+    #             }
+    #         ]
+    #     }
+    #     json_instance = ExcelFormula(expected_json)
+    #     print(json_instance.reconstruct_formula())  # Should output the same reconstructed formula
+    # except ValueError as e:
+    #     print(e)

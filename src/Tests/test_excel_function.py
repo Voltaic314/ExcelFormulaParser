@@ -7,14 +7,14 @@ class TestExcelFunction:
         """Test initialization with valid function strings and nested functions."""
         function = ExcelFunction("SUM(1, 2, 3)")
         assert function.name == "SUM"
-        assert function.arguments == ["1", "2", "3"], "Should handle simple numeric arguments"
+        assert function.args == ["1", "2", "3"], "Should handle simple numeric arguments"
 
         function = ExcelFunction("AVERAGE(1, 2, SUM(4, 5))")
         assert function.name == "AVERAGE"
-        assert len(function.arguments) == 3, "Should correctly parse all arguments"
-        assert function.arguments[0] == "1" and function.arguments[1] == "2", "Should parse simple arguments correctly"
-        assert isinstance(function.arguments[2], ExcelFunction), "The third argument should be an ExcelFunction instance"
-        nested_function = function.arguments[2]
+        assert len(function.args) == 3, "Should correctly parse all arguments"
+        assert function.args[0] == "1" and function.args[1] == "2", "Should parse simple arguments correctly"
+        assert isinstance(function.args[2], ExcelFunction), "The third argument should be an ExcelFunction instance"
+        nested_function = function.args[2]
         assert nested_function.name == "SUM", "Nested function should be identified correctly"
         assert nested_function.arguments == ["4", "5"], "Nested function should have the correct arguments"
 
