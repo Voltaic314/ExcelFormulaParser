@@ -1,7 +1,7 @@
 import re
 import pandas as pd
 from openpyxl.utils import column_index_from_string, get_column_letter
-from Objects.cell_reference import CellReference
+from Models.reference import Reference
 
 class CellRange:
     pattern = r"([A-Z]+\d+):([A-Z]+\d+)"  # Class attribute for the regex pattern
@@ -16,8 +16,8 @@ class CellRange:
         if end_ref is None:
             self.start_cell, self.end_cell = self.parse_range(start_ref)
         else:
-            self.start_cell = CellReference(start_ref)
-            self.end_cell = CellReference(end_ref)
+            self.start_cell = Reference(start_ref)
+            self.end_cell = Reference(end_ref)
 
     def parse_range(self, range_str):
         """Parse a range string into start and end CellReferences."""
@@ -25,7 +25,7 @@ class CellRange:
         if not match:
             raise ValueError(f"Invalid range format: {range_str}")
         start_ref, end_ref = match.groups()
-        return CellReference(start_ref), CellReference(end_ref)
+        return Reference(start_ref), Reference(end_ref)
     
     def get_rows_in_range(self):
         """Return a list of rows covered by the range."""
@@ -53,7 +53,8 @@ class CellRange:
     def to_dict(self):
         """Create a dictionary representation of the cell range."""
         return {
-            "cell_range": {
+            "range": str(self),
+            "components": {
                 "start": str(self.start_cell),
                 "end": str(self.end_cell)
             }

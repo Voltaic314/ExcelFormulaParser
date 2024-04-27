@@ -1,9 +1,10 @@
 import re 
 
 
-
 class Expression:
     operators = ['+', '-', '*', '/', '>', '<', '>=', '<=', '=', '<>']
+    operator_pattern = '|'.join(re.escape(op) for op in operators)  # Create a regex pattern for splitting
+
     def __init__(self, expression):
         self.original_expression = expression.strip()
         if not self.is_valid_expression(self.original_expression):
@@ -22,18 +23,22 @@ class Expression:
 
     @staticmethod
     def is_valid_expression(expr):
+        if not expr:
+            return False  # Empty string is not a valid expression
+
         # Basic check for the presence of an operator
         if not any(op in expr for op in Expression.operators):
             return False
-        
-        if len(expr) == 1:
-            return False # this is a single operator, not an expression
-        
+
         # Check for balanced parentheses
         if not Expression.has_balanced_parentheses(expr):
             return False
-        
-        # if none of our checks failed, return True
+
+        # Split expression by operators and check the parts
+        parts = re.split(Expression.operator_pattern, expr)
+        if any(not part.strip() for part in parts):  # Check if any part is empty or just whitespace
+            return False
+
         return True
 
     def parse_expression(self, expr):
@@ -96,7 +101,8 @@ class Expression:
         return str(self.original_expression)
 
     def to_dict(self):
-        return {"expression": self.expression}
+        return {"expression": str(self), 
+                "components": self.expression}
 
 
 # Example testing

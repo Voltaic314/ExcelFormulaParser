@@ -1,18 +1,22 @@
 import re
+from Models.expression import Expression
 
-class ExcelFunction:
+class Function:
     pattern = r"^([a-zA-Z_]+)\((.*)\)$"  # Matches function name and its arguments
 
     @staticmethod
     def is_function_string(function_string):
-        return bool(re.match(ExcelFunction.pattern, function_string.strip() if isinstance(function_string, str) else ""))
+        return bool(re.match(Function.pattern, function_string.strip() if isinstance(function_string, str) else ""))
 
     def __init__(self, function_string):
         function_string = function_string.strip() if isinstance(function_string, str) else ""
-        if not ExcelFunction.is_function_string(function_string):
+        if not Function.is_function_string(function_string):
             raise ValueError("Invalid function format")
         
-        self.name, self.args_str = re.match(ExcelFunction.pattern, function_string).groups()
+        if not Expression.has_balanced_parentheses(function_string):
+            raise ValueError("Unbalanced parentheses in function")
+
+        self.name, self.args_str = re.match(Function.pattern, function_string).groups()
         self.args = []
 
     def parse_arguments(self):
@@ -38,8 +42,8 @@ class ExcelFunction:
         self.args = [self.parse_arg(arg) for arg in args]
 
     def parse_arg(self, arg):
-        if ExcelFunction.is_function_string(arg):
-            nested_function = ExcelFunction(arg)
+        if Function.is_function_string(arg):
+            nested_function = Function(arg)
             nested_function.parse_arguments()
             return nested_function.to_dict()
         return arg  # Treat as plain string if not a function
@@ -48,23 +52,22 @@ class ExcelFunction:
         # Ensure arguments are parsed before converting to dictionary
         if not self.args:  # Parse only if not already parsed
             self.parse_arguments()
-        return {
-            "function": self.name,
+        return {"function": str(self),
+        "components": {
+            "name": self.name,
             "arguments": self.args
-        }
+        }}
 
     def __str__(self):
         # Ensure arguments are parsed before generating the string representation
         if not self.args:
             self.parse_arguments()
-        args_str = ', '.join(str(arg) if isinstance(arg, str) else f"{arg['function']}({', '.join(arg['arguments'])})" for arg in self.args)
+        args_str = ', '.join(str(arg) if isinstance(arg, str) else f"{arg['components']['name']}({', '.join(arg['components']['arguments'])})" for arg in self.args)
         return f"{self.name}({args_str})"
+
 
 # Example usage to test functionality
 if __name__ == "__main__":
-    try:
-        function = ExcelFunction("SUM(A1, MAX(B1, C1 + D1))")
-        print(function.to_dict())
-        print(function)  # For a more intuitive representation of the function
-    except ValueError as e:
-        print(e)
+        nested_function = Function("AVERAGE(1, 2, SUM(4, 5))")
+        nested_function.parse_arguments()  # Parse to ensure correct representation
+        print(str(nested_function) == "AVERAGE(1, 2, SUM(4, 5))")

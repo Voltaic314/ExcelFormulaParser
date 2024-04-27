@@ -1,9 +1,9 @@
 import json
-from Objects.cell_reference import CellReference
-from Objects.excel_function import ExcelFunction
-from Objects.cell_range import CellRange
-from Objects.expression import Expression
-from Objects.constant import Constant
+from Models.reference import Reference
+from Models.function import Function
+from Models.range import CellRange
+from Models.expression import Expression
+from Models.constant import Constant
 
 
 class FormulaParser:
@@ -11,12 +11,14 @@ class FormulaParser:
     def __init__(self, formula_str):
         if not formula_str.startswith('='):
             raise ValueError("Formula must start with an '=' sign.")
+        if not Expression.has_balanced_parentheses(formula_str):
+            raise ValueError("Unbalanced parentheses in formula.")
         self.formula = formula_str[1:]  # Skip the '=' sign for internal parsing
         self.full_formula = formula_str
 
     @property
     def reconstructed_formula(self):
-        return f"={self.reconstruct()}"
+        return f"={FormulaParser.json_to_string(self.parse())}"
 
     def parse(self):
         return self.parse_expression(self.formula)
@@ -26,35 +28,32 @@ class FormulaParser:
             # Handle nested parsed expressions
             if 'function' in expr:
                 # Re-parse each argument
-                expr['arguments'] = [self.parse_expression(arg) for arg in expr['arguments']]
+                expr['components']['arguments'] = [self.parse_expression(arg) for arg in expr['components']['arguments']]
             elif 'expression' in expr:
                 # Single expression re-parse
-                expr = self.parse_expression(expr['expression'])
+                expr = self.parse_expression(expr['components'])
             return expr
         elif isinstance(expr, str):
             expr = expr.strip()
 
             # Delegate function parsing to ExcelFunction if it matches the function pattern
-            if ExcelFunction.is_function_string(expr):
-                func = ExcelFunction(expr)
+            if Function.is_function_string(expr):
+                func = Function(expr)
                 func.parse_arguments()  # Ensure arguments are parsed within ExcelFunction
                 return {
-                    "function": func.name,
-                    "arguments": [self.parse_expression(arg) for arg in func.args]
-                }
+                    "function": str(func), 
+                    "components": {
+                        "name": func.name,
+                        "arguments": [self.parse_expression(arg) for arg in func.args]
+                }}
 
             # Parse ranges and references using the respective classes
             elif CellRange.is_valid_range(expr):
                 range_obj = CellRange(expr)
-                return {
-                    "cell_range": {
-                        "start": range_obj.start_cell.to_dict(),
-                        "end": range_obj.end_cell.to_dict()
-                    }
-                }
+                return range_obj.to_dict()
 
-            elif CellReference.is_valid_reference(expr):
-                ref = CellReference(expr)
+            elif Reference.is_valid_reference(expr):
+                ref = Reference(expr)
                 return ref.to_dict()
 
             # Constants can be parsed directly if they're valid
@@ -67,17 +66,12 @@ class FormulaParser:
             elif Expression.is_valid_expression(expr):
                 expression_obj = Expression(expr)
                 return {
-                    "expression": [self.parse_expression(part) for part in expression_obj.expression]
+                    "expression": str(expression_obj),
+                    "components": [self.parse_expression(part) for part in expression_obj.expression]
                 }
 
             elif any(op in expr for op in Expression.operators) and len(expr) == 1:
                 return {"operator": expr}
-
-            else:
-                return {"Unknown Value": expr}
-
-        else:
-            return {"Unknown Value": expr}
         
 
     def to_dict(self):
@@ -88,29 +82,36 @@ class FormulaParser:
         parsed_formula = self.parse()
         return json.dumps(parsed_formula, indent=4)
     
-    def reconstruct(self, json_obj=None):
-        if json_obj is None:
-            json_obj = self.to_dict()
+    @staticmethod
+    def json_to_string(json_obj):
         
         if 'function' in json_obj:
-            args_str = ', '.join(self.reconstruct(arg) for arg in json_obj['arguments'])
-            return f"{json_obj['function']}({args_str})"
-        elif 'cell_reference' in json_obj:
-            cell_ref = json_obj['cell_reference']
+            func = json_obj['components']
+            args_str = ', '.join(FormulaParser.json_to_string(arg) for arg in json_obj['arguments'])
+            return f"{func['name']}({args_str})"
+        
+        elif 'reference' in json_obj:
+            cell_ref = json_obj['components']
             sheet_name = cell_ref['sheet_name']
             if not sheet_name:
                 return f"{cell_ref['column_letter']}{cell_ref['row_number']}"
             else:
                 return f"'{sheet_name}'!{cell_ref['column_letter']}{cell_ref['row_number']}"
+        
+        elif 'range' in json_obj:
+            range_obj = json_obj['components']
+            return f"{range_obj['start']}:{range_obj['end']}"
+        
         elif 'expression' in json_obj:
-            expression_parts = ' '.join(self.reconstruct(part) for part in json_obj['expression'])
+            components = json_obj['components']
+            expression_parts = ' '.join(FormulaParser.json_to_string(part) for part in components)
             return f"({expression_parts})"
+        
         elif 'operator' in json_obj:
             return json_obj['operator']
+        
         elif 'constant' in json_obj:
             return str(json_obj['constant'])
-        else:
-            return json_obj['value']
     
     @staticmethod
     def get_all_keys_with_counts(d, keys_count=None):
@@ -125,25 +126,27 @@ class FormulaParser:
         dict: A dictionary with counts of all acceptable keys found in the dictionary, including nested ones.
         """
         acceptable_keys = {"function", "arguments", "expression",
-                        "cell_range", "cell_reference", "constant",
-                        "operator", "Unknown Value"}
+                        "range", "reference", "constant",
+                        "operator"}
         if keys_count is None:
             keys_count = {}
         
-        for key, value in d.items():
-            if key in acceptable_keys:
-                if key in keys_count:
-                    keys_count[key] += 1
-                else:
-                    keys_count[key] = 1
-            if isinstance(value, dict):
-                FormulaParser.get_all_keys_with_counts(value, keys_count)
-            elif isinstance(value, list):
-                # If the value is a list, iterate over elements that are dictionaries
-                for item in value:
-                    if isinstance(item, dict):
-                        FormulaParser.get_all_keys_with_counts(item, keys_count)
+        # Function to handle dictionary counting recursively
+        def count_keys(item, keys_count):
+            for key, value in item.items():
+                if key in acceptable_keys:
+                    keys_count[key] = keys_count.get(key, 0) + 1
+                
+                # Recurse into dictionaries
+                if isinstance(value, dict):
+                    count_keys(value, keys_count)
+                # Recurse into each dictionary in a list
+                elif isinstance(value, list):
+                    for sub_item in value:
+                        if isinstance(sub_item, dict):
+                            count_keys(sub_item, keys_count)
 
+        count_keys(d, keys_count)
         return keys_count
 
 
