@@ -44,6 +44,11 @@ class TestReference:
         cell.update_row_number(4)
         assert str(cell) == "D4", f"Expected 'D4', got {str(cell)}"
 
+        cell = Reference("C3")
+        cell.update_column_number(4)
+        cell.update_row_number(4)
+        assert str(cell) == "D4", f"Expected 'D4', got {str(cell)}"
+
     def test_string_representation_with_sheet_name(self):
         # Test string representation with a sheet name
         cell = Reference("'Sheet2'!E5")

@@ -1,5 +1,5 @@
 import re
-from openpyxl.utils import column_index_from_string
+from openpyxl.utils import column_index_from_string, get_column_letter
 
 class Reference:
     pattern = r"(?:'([^']+)'!)?([A-Z]+)(\d+)$"
@@ -28,11 +28,6 @@ class Reference:
         if self.row_number < 1:
             raise ValueError("Row number must be greater than 0.")
 
-    @property
-    def column_number(self):
-        """Convert the column letter to a number using openpyxl's utility."""
-        return column_index_from_string(self.column_letter)
-
     def to_dict(self):
         """Create a dictionary representation of the cell reference."""
         return {
@@ -45,14 +40,35 @@ class Reference:
             }
         }
 
-    def update_column_letter(self, new_letter):
-        """Update the column letter of the cell reference."""
-        if not new_letter.isalpha():
+    @property
+    def column_number(self):
+        return self._column_number
+
+    @column_number.setter
+    def column_number(self, value):
+        if not isinstance(value, int) or value < 1:
+            raise ValueError("Invalid column number")
+        self._column_number = value
+        self._column_letter = get_column_letter(value)
+
+    @property
+    def column_letter(self):
+        return self._column_letter
+
+    @column_letter.setter
+    def column_letter(self, value):
+        if not isinstance(value, str) or not value.isalpha():
             raise ValueError("Invalid column letter")
+        self._column_letter = value
+        self._column_number = column_index_from_string(value)
+
+    def update_column_letter(self, new_letter):
         self.column_letter = new_letter
 
+    def update_column_number(self, new_number):
+        self.column_number = new_number
+
     def update_row_number(self, new_number):
-        """Update the row number of the cell reference."""
         if not isinstance(new_number, int) or new_number <= 0:
             raise ValueError("Invalid row number")
         self.row_number = new_number

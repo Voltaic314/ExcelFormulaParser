@@ -6,7 +6,7 @@ from Models.expression import Expression
 from Models.constant import Constant
 
 
-class FormulaParser:
+class Parser:
 
     def __init__(self, formula_str):
         if not formula_str.startswith('='):
@@ -18,7 +18,8 @@ class FormulaParser:
 
     @property
     def reconstructed_formula(self):
-        return f"={FormulaParser.json_to_string(self.parse())}"
+        parsed_formula = self.parse()
+        return f"={Parser.json_to_string(parsed_formula)}"
 
     def parse(self):
         return self.parse_expression(self.formula)
@@ -87,7 +88,7 @@ class FormulaParser:
         
         if 'function' in json_obj:
             func = json_obj['components']
-            args_str = ', '.join(FormulaParser.json_to_string(arg) for arg in json_obj['arguments'])
+            args_str = ', '.join(Parser.json_to_string(arg) for arg in func['arguments'])
             return f"{func['name']}({args_str})"
         
         elif 'reference' in json_obj:
@@ -104,7 +105,7 @@ class FormulaParser:
         
         elif 'expression' in json_obj:
             components = json_obj['components']
-            expression_parts = ' '.join(FormulaParser.json_to_string(part) for part in components)
+            expression_parts = ' '.join(Parser.json_to_string(part) for part in components)
             return f"({expression_parts})"
         
         elif 'operator' in json_obj:
@@ -114,7 +115,7 @@ class FormulaParser:
             return str(json_obj['constant'])
     
     @staticmethod
-    def get_all_keys_with_counts(d, keys_count=None):
+    def get_all_keys_with_counts(d, keys_count=None, label=None):
         """
         Recursively collect and count keys from nested dictionaries if they are within acceptable keys.
         
@@ -128,6 +129,8 @@ class FormulaParser:
         acceptable_keys = {"function", "arguments", "expression",
                         "range", "reference", "constant",
                         "operator"}
+        if label:
+            acceptable_keys = {label}
         if keys_count is None:
             keys_count = {}
         
@@ -148,7 +151,42 @@ class FormulaParser:
 
         count_keys(d, keys_count)
         return keys_count
+    
 
+    def translate(self, from_cell, to_cell):
+        from_ref = Reference(from_cell)
+        to_ref = Reference(to_cell)
+
+        col_shift = to_ref.column_number - from_ref.column_number
+        row_shift = to_ref.row_number - from_ref.row_number
+
+        def update_reference(ref_dict):
+            # Create a Reference object from the dictionary's current state
+            ref_obj = Reference(f"{ref_dict['column_letter']}{ref_dict['row_number']}")
+            # Apply column and row shifts
+            ref_obj.update_column_number(ref_obj.column_number + col_shift)
+            ref_obj.update_row_number(ref_obj.row_number + row_shift)
+            # Return the updated dictionary
+            return ref_obj.to_dict()
+
+        def recurse_translate(data):
+            if isinstance(data, dict):
+                for key, value in data.items():
+                    if 'reference' in data.keys() and isinstance(value, dict):
+                        updated_dict = update_reference(value)
+                        updated_ref = Reference(updated_dict['reference'])
+                        data['reference'] = str(updated_ref)  # Update the string reference
+                        data['components'] = updated_ref.to_dict()['components']  # Update the detailed components
+                    elif isinstance(value, dict) or isinstance(value, list):
+                        recurse_translate(value)
+            elif isinstance(data, list):
+                for i, item in enumerate(data):
+                    data[i] = recurse_translate(item)
+            return data
+
+        # Apply the translation to the entire parsed formula structure
+        self.parsed_formula = recurse_translate(self.parse())
+        return self
 
 
 # Example usage of the FormulaParser class
@@ -156,7 +194,7 @@ if __name__ == "__main__":
     # formula = "=SUM(A1, MAX(B1, C1 + D1))"
     # formula = "=AVERAGE(SUM(A1:A10, B1), MAX(C1:C10), MIN(D1 + D2, E1))"
     formula = "=IF(AND(A1 > 0, B1 < 0), SUM(PRODUCT(A1, B2, MAX(C1, C2)), 10), 100)"
-    parser = FormulaParser(formula)
+    parser = Parser(formula)
     #print(parser)  # Show parsed formula
     print(formula)
     reconstructed_formula = parser.reconstructed_formula  # Reconstruct the formula from parsed JSON
@@ -166,3 +204,37 @@ if __name__ == "__main__":
     # keys = FormulaParser.get_all_keys_with_counts(parser.parse())
     # print(keys)
     # print("Unknown Value" in keys)  # Check if any unknown values were found
+
+
+    # testing formula translation
+    formula = "=SUM(A1, B2)"
+    parser = Parser(formula)
+    parser.translate('A1', 'C3')  # Example: Translate all references as if 'A1' moved to 'C3'
+    expected_output = {
+        "function": "SUM(C3, D4)",
+        "components": {
+            "name": "SUM",
+            "arguments": [
+                {
+                    'reference': 'C3', 
+                    'components': {
+                        'column_letter': 'C', 
+                        'row_number': 3,
+                        'sheet_name': None,
+                        'column_number': 3
+                    }
+                },
+                {
+                    'reference': 'D4', 
+                    'components': {
+                        'column_letter': 'D', 
+                        'row_number': 4,
+                        'sheet_name': None,
+                        'column_number': 4
+                    }
+                }
+            ]
+        }
+    }
+    output_dict = parser.to_dict()
+    assert output_dict == expected_output, "Translation should correctly adjust cell references"

@@ -62,7 +62,17 @@ class Function:
         # Ensure arguments are parsed before generating the string representation
         if not self.args:
             self.parse_arguments()
-        args_str = ', '.join(str(arg) if isinstance(arg, str) else f"{arg['components']['name']}({', '.join(arg['components']['arguments'])})" for arg in self.args)
+
+        def format_arg(arg):
+            """Recursively format arguments to string."""
+            if isinstance(arg, str):
+                return arg
+            elif isinstance(arg, dict):
+                # Recursively format nested functions or components
+                nested_args = ', '.join(format_arg(a) for a in arg['components']['arguments'])
+                return f"{arg['components']['name']}({nested_args})"
+
+        args_str = ', '.join(format_arg(arg) for arg in self.args)
         return f"{self.name}({args_str})"
 
 

@@ -1,6 +1,6 @@
 import re
 import json
-from Models.formula_parser import FormulaParser
+from Models.parser import Parser
 
 class Formula:
     # Static method to verify if the string is a valid formula
@@ -11,13 +11,18 @@ class Formula:
     def __init__(self, input_data):
         if not isinstance(input_data, (str, dict)):
             raise ValueError("Invalid input data type")
-        self.parsed_formula = FormulaParser(input_data).parse()
+        self.parser = Parser(input_data)
+        self.parsed_formula = self.parser.parse()
 
-    def to_dict(self):
+    def __dict__(self):
         return self.parsed_formula
     
     def __str__(self):
-        return self.parsed_formula.reconstructed_formula
+        return self.parser.reconstructed_formula
+    
+    def translate(self, input_cell, output_cell):
+        # Translate the formula from input_cell to output_cell
+        self.parsed_formula = self.parsed_formula.translate(input_cell, output_cell)
 
 
 if __name__ == "__main__":
@@ -25,7 +30,7 @@ if __name__ == "__main__":
     try:
         # parsed_formula = ExcelFormula("=SUM(A1, MAX(B1 + C1, 'Sheet2'!B2), 3 * (A2 + 4))")
         parsed_formula = Formula("=SUM(A1, MAX(B1, C1 + D1))")
-        formula_dict = parsed_formula.to_dict()
+        formula_dict = dict(parsed_formula)
         print(json.dumps(formula_dict, indent=4))
     except ValueError as e:
         print(e)
