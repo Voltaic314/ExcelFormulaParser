@@ -1,7 +1,7 @@
 import json
 from Models.reference import Reference
 from Models.function import Function
-from Models.range import CellRange
+from Models.range import Range
 from Models.expression import Expression
 from Models.constant import Constant
 
@@ -49,8 +49,8 @@ class Parser:
                 }}
 
             # Parse ranges and references using the respective classes
-            elif CellRange.is_valid_range(expr):
-                range_obj = CellRange(expr)
+            elif Range.is_valid_range(expr):
+                range_obj = Range(expr)
                 return range_obj.to_dict()
 
             elif Reference.is_valid_reference(expr):
@@ -73,7 +73,6 @@ class Parser:
 
             elif any(op in expr for op in Expression.operators) and len(expr) == 1:
                 return {"operator": expr}
-        
 
     def to_dict(self):
         return self.parse()
@@ -106,6 +105,13 @@ class Parser:
         elif 'expression' in json_obj:
             components = json_obj['components']
             expression_parts = ' '.join(Parser.json_to_string(part) for part in components)
+            
+            '''
+            The reason we put parenthesis around the expression is because 
+            we want to ensure precision in the order of operations in the formula string.
+            If this isn't done, information could be lost in translation between 
+            the two data types of strings and dictionary structures.
+            '''
             return f"({expression_parts})"
         
         elif 'operator' in json_obj:
@@ -154,6 +160,11 @@ class Parser:
     
 
     def translate(self, from_cell, to_cell):
+        object_name_map = {
+            "expression": Expression,
+            "range": Range,
+            "reference": Reference,
+        }
         from_ref = Reference(from_cell)
         to_ref = Reference(to_cell)
 
@@ -162,28 +173,57 @@ class Parser:
 
         def update_reference(ref_dict):
             # Create a Reference object from the dictionary's current state
-            ref_obj = Reference(f"{ref_dict['column_letter']}{ref_dict['row_number']}")
+            ref_obj = Reference.from_dict({'components': ref_dict})
             # Apply column and row shifts
             ref_obj.update_column_number(ref_obj.column_number + col_shift)
             ref_obj.update_row_number(ref_obj.row_number + row_shift)
             # Return the updated dictionary
             return ref_obj.to_dict()
 
-        def recurse_translate(data):
-            if isinstance(data, dict):
-                for key, value in data.items():
-                    if 'reference' in data.keys() and isinstance(value, dict):
-                        updated_dict = update_reference(value)
-                        updated_ref = Reference(updated_dict['reference'])
-                        data['reference'] = str(updated_ref)  # Update the string reference
-                        data['components'] = updated_ref.to_dict()['components']  # Update the detailed components
-                    elif isinstance(value, dict) or isinstance(value, list):
-                        recurse_translate(value)
-            elif isinstance(data, list):
-                for i, item in enumerate(data):
-                    data[i] = recurse_translate(item)
+        def reconstruct_expression(data):
+            for key, class_type in object_name_map.items():
+                if key in data:
+                    if hasattr(class_type, 'from_dict'):
+                        return class_type.from_dict({'components': data[key]})
+            if 'function' in data: 
+                return Function.from_dict(data)
             return data
 
+        def recurse_translate(data):
+            if 'operator' in data or 'constant' in data:
+                return data
+            
+            if isinstance(data, dict):
+                # Handle the "reference" and other expression objects directly in the structure
+                if 'reference' in data:
+                    updated_dict = update_reference(data['components'])
+                    updated_ref = Reference.from_dict({'components': updated_dict['components']})
+                    data['reference'] = str(updated_ref)
+                    data['components'] = updated_ref.to_dict()['components']
+                    return data
+                
+                # Recursively process dictionaries and lists
+                for key, value in data.items():
+                    if isinstance(value, dict) or isinstance(value, list):
+                        data[key] = recurse_translate(value)
+                    else:
+                        # Attempt to reconstruct using the appropriate class if the key is identified
+                        if key in object_name_map:
+                            reconstruction = reconstruct_expression({key: value})
+                            data[key] = str(reconstruction)
+                            data['components'] = reconstruction.to_dict()['components']
+                        elif key == 'function':
+                            reconstruction = Function.from_dict(data)
+                            data[key] = str(reconstruction)
+                            data['components'] = reconstruction.to_dict()['components']
+                return data
+
+            
+            elif isinstance(data, list):
+                return [recurse_translate(item) for item in data]
+            
+            return data
+        
         # Apply the translation to the entire parsed formula structure
         self.parsed_formula = recurse_translate(self.parse())
         return self

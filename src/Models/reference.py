@@ -3,30 +3,80 @@ from openpyxl.utils import column_index_from_string, get_column_letter
 
 class Reference:
     pattern = r"(?:'([^']+)'!)?([A-Z]+)(\d+)$"
-
+    
+    @staticmethod
+    def from_dict(ref_dict):
+        """Reconstruct the reference string from its dictionary representation."""
+        column_letter = ref_dict['components']['column_letter']
+        row_number = ref_dict['components']['row_number']
+        sheet_name = ref_dict['components'].get('sheet_name', None)
+        # return an instance of the Reference class using the parsed components
+        if sheet_name:
+            return Reference(f"'{sheet_name}'!{column_letter}{row_number}")
+        return Reference(f"{column_letter}{row_number}")
+    
     @staticmethod
     def is_valid_reference(cell_ref):
         """Check if the provided cell reference is valid."""
         if not cell_ref:
             return False
-        match = re.match(Reference.pattern, cell_ref)
-        return bool(match) or isinstance(cell_ref, Reference)
+        
+        row_number = None
+        column_letter = None
+        column_number = None
+
+        ref_is_dict = isinstance(cell_ref, dict)
+        ref_is_str = isinstance(cell_ref, str)
+        if ref_is_str:
+            match = re.match(Reference.pattern, cell_ref)
+            if not match:
+                return False
+            _, column_letter, row_number = match.groups()
+            row_number = int(row_number)
+            if not row_number:
+                return False
+            # if there isn't at least a column letter or column number, then return false
+            if not (column_letter or column_number):
+                return False
+
+        elif ref_is_dict:
+            if not 'components' in cell_ref:
+                return False
+            
+            components = cell_ref['components']
+            if not 'row_number' in components or (not 'column_letter' in components or not 'column_number' in components):
+                return False
+
+            column_letter = components.get('column_letter', None)
+            column_number = components.get('column_number', None)
+            row_number = components['row_number']
+
+        if not column_number:
+            column_number = column_index_from_string(column_letter)
+
+        # breaking conditions - types
+        if not isinstance(row_number, int) or not isinstance(column_number, int) or not isinstance(column_letter, str):
+            return False
+
+        # breaking conditions - values
+        if column_number < 0 or row_number < 0 or not column_letter.isalpha():
+            return False
+        
+        return True
 
     def __init__(self, cell_ref):
         """Initialize the CellReference instance by parsing the provided reference."""
+        valid = Reference.is_valid_reference(cell_ref)
+        if not valid:
+            raise ValueError(f"Invalid cell reference: {cell_ref}")
         self.parse_cell_ref(cell_ref)
 
     def parse_cell_ref(self, cell_ref):
         """Parse the cell reference string and set the object attributes."""
-        valid = Reference.is_valid_reference(cell_ref)
-        if not valid:
-            raise ValueError(f"Invalid cell reference: {cell_ref}")
         match = re.match(Reference.pattern, cell_ref)
         
         self.sheet_name, self.column_letter, row_number = match.groups()
         self.row_number = int(row_number)
-        if self.row_number < 1:
-            raise ValueError("Row number must be greater than 0.")
 
     def to_dict(self):
         """Create a dictionary representation of the cell reference."""

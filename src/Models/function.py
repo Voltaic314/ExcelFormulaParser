@@ -5,6 +5,26 @@ class Function:
     pattern = r"^([a-zA-Z_]+)\((.*)\)$"  # Matches function name and its arguments
 
     @staticmethod
+    def from_dict(function_dict):
+        """Reconstruct the function from its dictionary representation."""
+        name = function_dict['components']['name']
+        raw_args = function_dict['components']['arguments']
+        args = []
+        
+        for arg in raw_args:
+            if isinstance(arg, dict) and 'function' in arg:
+                # Recursively reconstruct nested functions
+                nested_function = Function.from_dict(arg)
+                args.append(nested_function)
+            else:
+                args.append(arg)
+
+        # Join args into a function string
+        args_str = ', '.join(str(a) if isinstance(a, Function) else str(a) for a in args)
+        function_str = f"{name}({args_str})"
+        return Function(function_str)
+
+    @staticmethod
     def is_function_string(function_string):
         return bool(re.match(Function.pattern, function_string.strip() if isinstance(function_string, str) else ""))
 

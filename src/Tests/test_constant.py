@@ -32,3 +32,8 @@ class TestConstant:
     def test_to_dict(self):
         const = Constant('456')
         assert const.to_dict() == {'constant': 456}
+
+    def test_from_dict(self):
+        const = Constant.from_dict({'constant': 456})
+        assert const.value == 456
+        assert isinstance(const, Constant)
