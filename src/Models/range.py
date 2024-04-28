@@ -3,13 +3,13 @@ import pandas as pd
 from openpyxl.utils import column_index_from_string, get_column_letter
 from Models.reference import Reference
 
-class CellRange:
+class Range:
     pattern = r"([A-Z]+\d+):([A-Z]+\d+)"  # Class attribute for the regex pattern
 
     @staticmethod
     def is_valid_range(range_str):
         """Check if the string represents a valid cell range."""
-        return bool(re.match(CellRange.pattern, range_str)) or isinstance(range_str, CellRange)
+        return bool(re.match(Range.pattern, range_str)) or isinstance(range_str, Range)
 
     def __init__(self, start_ref, end_ref=None):
         """Initialize CellRange either from a single range string or from two CellReference objects."""
@@ -21,7 +21,7 @@ class CellRange:
 
     def parse_range(self, range_str):
         """Parse a range string into start and end CellReferences."""
-        match = re.match(CellRange.pattern, range_str)
+        match = re.match(Range.pattern, range_str)
         if not match:
             raise ValueError(f"Invalid range format: {range_str}")
         start_ref, end_ref = match.groups()
@@ -70,14 +70,14 @@ if __name__ == "__main__":
 
     for valid_range in valid_ranges:
         try:
-            cell_range = CellRange(valid_range)
+            cell_range = Range(valid_range)
             print(f"Successfully created cell range: {cell_range}")
         except ValueError as e:
             print(f"Error creating cell range: {e}")
 
     for invalid_range in invalid_ranges:
         try:
-            cell_range = CellRange(invalid_range)
+            cell_range = Range(invalid_range)
             print(f"Successfully created cell range: {cell_range}")
         except ValueError as e:
             print(f"Error creating cell range: {e}")

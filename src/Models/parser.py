@@ -1,12 +1,12 @@
 import json
 from Models.reference import Reference
 from Models.function import Function
-from Models.range import CellRange
+from Models.range import Range
 from Models.expression import Expression
 from Models.constant import Constant
 
 
-class FormulaParser:
+class Parser:
 
     def __init__(self, formula_str):
         if not formula_str.startswith('='):
@@ -18,7 +18,7 @@ class FormulaParser:
 
     @property
     def reconstructed_formula(self):
-        return f"={FormulaParser.json_to_string(self.parse())}"
+        return f"={Parser.json_to_string(self.parse())}"
 
     def parse(self):
         return self.parse_expression(self.formula)
@@ -48,8 +48,8 @@ class FormulaParser:
                 }}
 
             # Parse ranges and references using the respective classes
-            elif CellRange.is_valid_range(expr):
-                range_obj = CellRange(expr)
+            elif Range.is_valid_range(expr):
+                range_obj = Range(expr)
                 return range_obj.to_dict()
 
             elif Reference.is_valid_reference(expr):
@@ -87,7 +87,7 @@ class FormulaParser:
         
         if 'function' in json_obj:
             func = json_obj['components']
-            args_str = ', '.join(FormulaParser.json_to_string(arg) for arg in json_obj['arguments'])
+            args_str = ', '.join(Parser.json_to_string(arg) for arg in json_obj['arguments'])
             return f"{func['name']}({args_str})"
         
         elif 'reference' in json_obj:
@@ -104,7 +104,7 @@ class FormulaParser:
         
         elif 'expression' in json_obj:
             components = json_obj['components']
-            expression_parts = ' '.join(FormulaParser.json_to_string(part) for part in components)
+            expression_parts = ' '.join(Parser.json_to_string(part) for part in components)
             return f"({expression_parts})"
         
         elif 'operator' in json_obj:
@@ -156,7 +156,7 @@ if __name__ == "__main__":
     # formula = "=SUM(A1, MAX(B1, C1 + D1))"
     # formula = "=AVERAGE(SUM(A1:A10, B1), MAX(C1:C10), MIN(D1 + D2, E1))"
     formula = "=IF(AND(A1 > 0, B1 < 0), SUM(PRODUCT(A1, B2, MAX(C1, C2)), 10), 100)"
-    parser = FormulaParser(formula)
+    parser = Parser(formula)
     #print(parser)  # Show parsed formula
     print(formula)
     reconstructed_formula = parser.reconstructed_formula  # Reconstruct the formula from parsed JSON
