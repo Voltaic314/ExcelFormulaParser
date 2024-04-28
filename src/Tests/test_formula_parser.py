@@ -1,5 +1,5 @@
 import pytest
-from Models.formula_parser import Parser
+from src.Models.parser import Parser
 
 class TestFormulaParser:
     
