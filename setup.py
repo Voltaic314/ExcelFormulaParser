@@ -10,6 +10,7 @@ setup(
     description="A framework to break down Excel Formula strings into a parsable and modifiable JSON data structure.",
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
+    url='https://github.com/Voltaic314/ExcelFormulaParser',
     install_requires=[
         'openpyxl',  # List your dependencies here
         'pandas',
