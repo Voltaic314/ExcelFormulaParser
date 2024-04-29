@@ -1,4 +1,5 @@
 import re 
+from Models.types import Types
 
 
 class Expression:
@@ -16,6 +17,15 @@ class Expression:
                     if 'expression' in component:
                         nested_expr = reconstruct_expression(component['expression'])
                         parts.append(f"({nested_expr})")
+                    elif 'operator' in component:
+                        parts.append(component['operator'])
+                    elif 'constant' in component:
+                        parts.append(str(component['constant']))
+                    else:
+                        type_str = [item for item in component.keys() if item not in ['components']][0]
+                        obj_type = Types(type_str).get_type()
+                        instance = obj_type.from_dict(component)
+                        parts.append(str(instance))
                 else:
                     parts.append(str(component))
             return ' '.join(parts)

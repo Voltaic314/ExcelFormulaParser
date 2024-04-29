@@ -15,6 +15,7 @@ class Parser:
             raise ValueError("Unbalanced parentheses in formula.")
         self.formula = formula_str[1:]  # Skip the '=' sign for internal parsing
         self.full_formula = formula_str
+        self.parsed_formula = self.parse()
 
     @property
     def reconstructed_formula(self):
@@ -75,7 +76,7 @@ class Parser:
                 return {"operator": expr}
 
     def to_dict(self):
-        return self.parse()
+        return self.parsed_formula
 
     def __str__(self):
         # Provides a JSON string representation of the parsed formula
@@ -160,73 +161,54 @@ class Parser:
     
 
     def translate(self, from_cell, to_cell):
-        object_name_map = {
-            "expression": Expression,
-            "range": Range,
-            "reference": Reference,
-        }
         from_ref = Reference(from_cell)
         to_ref = Reference(to_cell)
 
+        # Calculate shifts
         col_shift = to_ref.column_number - from_ref.column_number
         row_shift = to_ref.row_number - from_ref.row_number
 
-        def update_reference(ref_dict):
-            # Create a Reference object from the dictionary's current state
-            ref_obj = Reference.from_dict({'components': ref_dict})
-            # Apply column and row shifts
-            ref_obj.update_column_number(ref_obj.column_number + col_shift)
-            ref_obj.update_row_number(ref_obj.row_number + row_shift)
-            # Return the updated dictionary
-            return ref_obj.to_dict()
+        # Apply translation to the parsed formula
+        self.parsed_formula = self.recurse_translate(self.parse(), col_shift, row_shift)
 
-        def reconstruct_expression(data):
-            for key, class_type in object_name_map.items():
-                if key in data:
-                    if hasattr(class_type, 'from_dict'):
-                        return class_type.from_dict({'components': data[key]})
-            if 'function' in data: 
-                return Function.from_dict(data)
-            return data
-
-        def recurse_translate(data):
-            if 'operator' in data or 'constant' in data:
-                return data
-            
-            if isinstance(data, dict):
-                # Handle the "reference" and other expression objects directly in the structure
-                if 'reference' in data:
-                    updated_dict = update_reference(data['components'])
-                    updated_ref = Reference.from_dict({'components': updated_dict['components']})
-                    data['reference'] = str(updated_ref)
-                    data['components'] = updated_ref.to_dict()['components']
-                    return data
-                
-                # Recursively process dictionaries and lists
-                for key, value in data.items():
-                    if isinstance(value, dict) or isinstance(value, list):
-                        data[key] = recurse_translate(value)
-                    else:
-                        # Attempt to reconstruct using the appropriate class if the key is identified
-                        if key in object_name_map:
-                            reconstruction = reconstruct_expression({key: value})
-                            data[key] = str(reconstruction)
-                            data['components'] = reconstruction.to_dict()['components']
-                        elif key == 'function':
-                            reconstruction = Function.from_dict(data)
-                            data[key] = str(reconstruction)
-                            data['components'] = reconstruction.to_dict()['components']
-                return data
-
-            
-            elif isinstance(data, list):
-                return [recurse_translate(item) for item in data]
-            
-            return data
+    def recurse_translate(self, data, col_shift, row_shift):
+        if isinstance(data, list):
+            return [self.recurse_translate(item, col_shift, row_shift) for item in data]
+        composite_data_types = ['function', 'expression', 'range'] # also formulas but that doesn't matter here
+        data_type = [dt for dt in composite_data_types if dt in data]
+        if data_type:
+            data_type = data_type[0]
         
-        # Apply the translation to the entire parsed formula structure
-        self.parsed_formula = recurse_translate(self.parse())
-        return self
+        if not data_type and not 'reference' in data:
+            return data
+
+        # this whole section feels a little hard coded, 
+        # but there's only a few cases so I guess it's okay. 
+        if 'reference' in data:
+            ref = Reference(data['reference'])
+            ref.update_column_number(ref.column_number + col_shift)
+            ref.update_row_number(ref.row_number + row_shift)
+            data.update(ref.to_dict())
+
+        elif any(data_type):
+            # recursively translate all the components of the composite type
+            # then update it's dictionary (using the update method) with whatever the changes were if any
+            if data_type == 'function':
+                arg_updates = [self.recurse_translate(arg, col_shift, row_shift) for arg in data['components']['arguments']]
+                data['components']['arguments'] = arg_updates
+                if arg_updates:
+                    func = Function.from_dict(data)
+                    data['function'] = str(func)
+            elif data_type == 'expression':
+                updated_components = [self.recurse_translate(comp, col_shift, row_shift) for comp in data['components']]
+                data.update({"components": updated_components})
+                expr = Expression.from_dict(data)
+                data.update({"expression": str(expr)})
+            elif data_type == 'range':
+                data['components']['start'].update(self.recurse_translate(data['components']['start'], col_shift, row_shift))
+                data['components']['end'].update(self.recurse_translate(data['components']['end'], col_shift, row_shift))
+
+        return data
 
 
 # Example usage of the FormulaParser class
@@ -248,6 +230,7 @@ if __name__ == "__main__":
 
     # testing formula translation
     formula = "=SUM(A1, B2)"
+    # formula = '=A1 + B2'
     parser = Parser(formula)
     parser.translate('A1', 'C3')  # Example: Translate all references as if 'A1' moved to 'C3'
     expected_output = {
