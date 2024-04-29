@@ -12,7 +12,7 @@ setup(
     long_description_content_type='text/markdown',
     install_requires=[
         'openpyxl',  # List your dependencies here
-        # other dependencies...
+        'pandas',
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

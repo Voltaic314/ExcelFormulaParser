@@ -1,6 +1,5 @@
 import re
-import json
-from Models.types import Types
+from Models.model_types import Types
 
 class Function:
     pattern = r"^([a-zA-Z_]+)\((.*)\)$"  # Matches function name and its arguments
@@ -16,7 +15,6 @@ class Function:
             elif char == ')':
                 balance -= 1
         return balance == 0
-
 
     @staticmethod
     def from_dict(function_dict):
@@ -127,5 +125,37 @@ class Function:
 
 # Example usage to test functionality
 if __name__ == "__main__":
-    nested_function = Function("AVERAGE(1, 2, SUM(4, 5))")
-    print(str(nested_function) == "AVERAGE(1, 2, SUM(4, 5))")
+    # nested_function = Function("AVERAGE(1, 2, SUM(4, 5))")
+    # print(str(nested_function) == "AVERAGE(1, 2, SUM(4, 5))")
+
+    example_dict = {
+        "function": "SUM(C3, D4)",
+        "components": {
+            "name": "SUM",
+            "arguments": [
+                {
+                    'reference': 'C3', 
+                    'components': {
+                        'column_letter': 'C', 
+                        'row_number': 3,
+                        'sheet_name': None,
+                        'column_number': 3
+                    }
+                },
+                {
+                    'reference': 'D4', 
+                    'components': {
+                        'column_letter': 'D', 
+                        'row_number': 4,
+                        'sheet_name': None,
+                        'column_number': 4
+                    }
+                }
+            ]
+        }
+    }
+    expected_str_output = "SUM(C3, D4)"
+
+    # testing from dict
+    function = Function.from_dict(example_dict)
+    print(str(function) == expected_str_output)

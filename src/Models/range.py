@@ -10,7 +10,11 @@ class Range:
     def from_dict(range_dict):
         """Reconstruct the cell range from its dictionary representation."""
         start_ref = range_dict['components']['start']
+        if 'reference' in start_ref:
+            start_ref = str(Reference.from_dict(start_ref))
         end_ref = range_dict['components']['end']
+        if 'reference' in end_ref:
+            end_ref = str(Reference.from_dict(end_ref))
         return Range(f"{start_ref}:{end_ref}")
 
     @staticmethod
@@ -19,12 +23,17 @@ class Range:
         return bool(re.match(Range.pattern, range_str)) or isinstance(range_str, Range)
 
     def __init__(self, start_ref, end_ref=None):
-        """Initialize CellRange either from a single range string or from two CellReference objects."""
+        """Initialize the range either from a range string or from two references."""
         if end_ref is None:
             self.start_cell, self.end_cell = self.parse_range(start_ref)
         else:
             self.start_cell = Reference(start_ref)
             self.end_cell = Reference(end_ref)
+        self.rows = self.get_rows_in_range()
+        self.columns = self.get_columns_in_range(as_numbers=True)
+        self.cell_matrix = self.get_cells_in_range()  # Get a list of lists of cell references
+        self.row_index = 0
+        self.col_index = 0
 
     def parse_range(self, range_str):
         """Parse a range string into start and end CellReferences."""
@@ -66,6 +75,35 @@ class Range:
                 "end": str(self.end_cell)
             }
         }
+
+    def __iter__(self):
+        """Reset the iterator to the start of the range."""
+        self.row_index = 0
+        self.col_index = 0
+        return self
+
+    def __next__(self):
+        if self.row_index >= len(self.rows):
+            raise StopIteration
+
+        current_cell = self.cell_matrix[self.row_index][self.col_index]
+        self.col_index += 1
+
+        if self.col_index >= len(self.columns):
+            self.col_index = 0
+            self.row_index += 1
+
+        return current_cell
+
+    def __contains__(self, item):
+        """Check if a cell like 'B1' is in the range of 'A1:B2' for example."""
+        if isinstance(item, str):
+            try:
+                item_ref = Reference(item)
+                return (column_index_from_string(self.start_cell.column_letter) <= column_index_from_string(item_ref.column_letter) <= column_index_from_string(self.end_cell.column_letter)) and (self.start_cell.row_number <= item_ref.row_number <= self.end_cell.row_number)
+            except ValueError:
+                return False
+        return False
 
     def __str__(self):
         """String representation of the cell range."""
