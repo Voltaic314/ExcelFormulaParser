@@ -43,3 +43,31 @@ class TestFunction:
         nested_function = Function("AVERAGE(1, 2, SUM(4, 5))")
         nested_function.parse_arguments()  # Parse to ensure correct representation
         assert str(nested_function) == "AVERAGE(1, 2, SUM(4, 5))", "Should properly format nested functions in string representation"
+
+    def test_from_dict(self):
+        """Test creating a Function instance from a dictionary."""
+        function_dict = {
+            "function": "AVERAGE(1, 2, SUM(4, 5))",
+            "components": {
+                "name": "AVERAGE",
+                "arguments": ["1", "2", {
+                    "function": "SUM(4, 5)",
+                    "components": {
+                        "name": "SUM",
+                        "arguments": ["4", "5"]
+                    }
+                }]
+            }
+        }
+        function = Function.from_dict(function_dict)
+        assert isinstance(function, Function) == True, "Should return a Function instance"
+        assert str(function) == "AVERAGE(1, 2, SUM(4, 5))", "Function should be created from dictionary"   
+        assert function.name == "AVERAGE", "Name should be set correctly"
+        assert len(function.args) == 3, "Arguments should be parsed correctly"
+        assert function.args == ["1", "2", {
+            "function": "SUM(4, 5)",
+            "components": {
+                "name": "SUM",
+                "arguments": ["4", "5"]
+            }
+        }], "Nested function should be parsed correctly"

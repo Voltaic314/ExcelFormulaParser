@@ -3,14 +3,15 @@
 class Constant:
 
     @staticmethod
+    def from_dict(constant_dict):
+        return Constant(constant_dict['constant'])
+
+    @staticmethod
     def is_valid_constant(arg):
         # Check if the arg is a digit, possibly a float or an integer
         if not str(arg).isdigit() or not str(arg).isnumeric():
             return False
         return True
-
-    def __init__(self, value):
-        self.value = value
 
     def __init__(self, value):
         # Automatically parse and set value during initialization

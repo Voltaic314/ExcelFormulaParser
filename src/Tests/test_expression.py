@@ -55,7 +55,25 @@ class TestExpression:
         assert expression.to_dict() == expected_dict
 
     def test_string_representation(self):
-        """ Test the string representation of the expression object """
-        expr = "A1 + B1"
-        expression = Expression(expr)
-        assert str(expression) == "A1 + B1"
+        """Test the string representation of expressions to ensure they are reconstructed correctly."""
+        cases = [
+            ("1 + 2", "1 + 2"),
+            ("1 + 2 * 3", "1 + 2 * 3"),
+            ("1 + (2 * 3)", "1 + (2 * 3)"),
+            ("(1 + 2) * 3", "(1 + 2) * 3"),
+            ("1 + 2 * (3 + 4)", "1 + 2 * (3 + 4)"),  # Nested expressions
+        ]
+
+        for original, expected in cases:
+            expression = Expression(original)
+            assert str(expression) == expected, f"Expected '{expected}' from '{original}', but got '{str(expression)}'"
+
+
+    def test_expression_from_dict(self):
+        """Test creating an Expression instance from a dictionary."""
+        expression_dict = {
+            "expression": "1 + 2 * (3 + 4)",
+            "components": ["1", "+", "2", "*", {"expression": ["3", "+", "4"]}]
+        }
+        expression = Expression.from_dict(expression_dict)
+        assert str(expression) == "1 + 2 * (3 + 4)", "Expression should be created from dictionary and match the expected output"

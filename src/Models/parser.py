@@ -15,10 +15,12 @@ class Parser:
             raise ValueError("Unbalanced parentheses in formula.")
         self.formula = formula_str[1:]  # Skip the '=' sign for internal parsing
         self.full_formula = formula_str
+        self.parsed_formula = self.parse()
 
     @property
     def reconstructed_formula(self):
-        return f"={Parser.json_to_string(self.parse())}"
+        parsed_formula = self.parse()
+        return f"={Parser.json_to_string(parsed_formula)}"
 
     def parse(self):
         return self.parse_expression(self.formula)
@@ -72,10 +74,9 @@ class Parser:
 
             elif any(op in expr for op in Expression.operators) and len(expr) == 1:
                 return {"operator": expr}
-        
 
     def to_dict(self):
-        return self.parse()
+        return self.parsed_formula
 
     def __str__(self):
         # Provides a JSON string representation of the parsed formula
@@ -87,7 +88,7 @@ class Parser:
         
         if 'function' in json_obj:
             func = json_obj['components']
-            args_str = ', '.join(Parser.json_to_string(arg) for arg in json_obj['arguments'])
+            args_str = ', '.join(Parser.json_to_string(arg) for arg in func['arguments'])
             return f"{func['name']}({args_str})"
         
         elif 'reference' in json_obj:
@@ -105,6 +106,13 @@ class Parser:
         elif 'expression' in json_obj:
             components = json_obj['components']
             expression_parts = ' '.join(Parser.json_to_string(part) for part in components)
+            
+            '''
+            The reason we put parenthesis around the expression is because 
+            we want to ensure precision in the order of operations in the formula string.
+            If this isn't done, information could be lost in translation between 
+            the two data types of strings and dictionary structures.
+            '''
             return f"({expression_parts})"
         
         elif 'operator' in json_obj:
@@ -114,7 +122,7 @@ class Parser:
             return str(json_obj['constant'])
     
     @staticmethod
-    def get_all_keys_with_counts(d, keys_count=None):
+    def get_all_keys_with_counts(d, keys_count=None, label=None):
         """
         Recursively collect and count keys from nested dictionaries if they are within acceptable keys.
         
@@ -128,6 +136,8 @@ class Parser:
         acceptable_keys = {"function", "arguments", "expression",
                         "range", "reference", "constant",
                         "operator"}
+        if label:
+            acceptable_keys = {label}
         if keys_count is None:
             keys_count = {}
         
@@ -148,7 +158,57 @@ class Parser:
 
         count_keys(d, keys_count)
         return keys_count
+    
 
+    def translate(self, from_cell, to_cell):
+        from_ref = Reference(from_cell)
+        to_ref = Reference(to_cell)
+
+        # Calculate shifts
+        col_shift = to_ref.column_number - from_ref.column_number
+        row_shift = to_ref.row_number - from_ref.row_number
+
+        # Apply translation to the parsed formula
+        self.parsed_formula = self.recurse_translate(self.parse(), col_shift, row_shift)
+
+    def recurse_translate(self, data, col_shift, row_shift):
+        if isinstance(data, list):
+            return [self.recurse_translate(item, col_shift, row_shift) for item in data]
+        composite_data_types = ['function', 'expression', 'range'] # also formulas but that doesn't matter here
+        data_type = [dt for dt in composite_data_types if dt in data]
+        if data_type:
+            data_type = data_type[0]
+        
+        if not data_type and not 'reference' in data:
+            return data
+
+        # this whole section feels a little hard coded, 
+        # but there's only a few cases so I guess it's okay. 
+        if 'reference' in data:
+            ref = Reference(data['reference'])
+            ref.update_column_number(ref.column_number + col_shift)
+            ref.update_row_number(ref.row_number + row_shift)
+            data.update(ref.to_dict())
+
+        elif any(data_type):
+            # recursively translate all the components of the composite type
+            # then update it's dictionary (using the update method) with whatever the changes were if any
+            if data_type == 'function':
+                arg_updates = [self.recurse_translate(arg, col_shift, row_shift) for arg in data['components']['arguments']]
+                data['components']['arguments'] = arg_updates
+                if arg_updates:
+                    func = Function.from_dict(data)
+                    data['function'] = str(func)
+            elif data_type == 'expression':
+                updated_components = [self.recurse_translate(comp, col_shift, row_shift) for comp in data['components']]
+                data.update({"components": updated_components})
+                expr = Expression.from_dict(data)
+                data.update({"expression": str(expr)})
+            elif data_type == 'range':
+                data['components']['start'].update(self.recurse_translate(data['components']['start'], col_shift, row_shift))
+                data['components']['end'].update(self.recurse_translate(data['components']['end'], col_shift, row_shift))
+
+        return data
 
 
 # Example usage of the FormulaParser class
@@ -166,3 +226,38 @@ if __name__ == "__main__":
     # keys = FormulaParser.get_all_keys_with_counts(parser.parse())
     # print(keys)
     # print("Unknown Value" in keys)  # Check if any unknown values were found
+
+
+    # testing formula translation
+    formula = "=SUM(A1, B2)"
+    # formula = '=A1 + B2'
+    parser = Parser(formula)
+    parser.translate('A1', 'C3')  # Example: Translate all references as if 'A1' moved to 'C3'
+    expected_output = {
+        "function": "SUM(C3, D4)",
+        "components": {
+            "name": "SUM",
+            "arguments": [
+                {
+                    'reference': 'C3', 
+                    'components': {
+                        'column_letter': 'C', 
+                        'row_number': 3,
+                        'sheet_name': None,
+                        'column_number': 3
+                    }
+                },
+                {
+                    'reference': 'D4', 
+                    'components': {
+                        'column_letter': 'D', 
+                        'row_number': 4,
+                        'sheet_name': None,
+                        'column_number': 4
+                    }
+                }
+            ]
+        }
+    }
+    output_dict = parser.to_dict()
+    assert output_dict == expected_output, "Translation should correctly adjust cell references"

@@ -1,7 +1,7 @@
 import pytest
-from src.Models.parser import Parser
+from Models.parser import Parser
 
-class TestFormulaParser:
+class TestParser:
     
     def test_basic_formula_parsing(self):
         """ Test parsing of simple formulas with no nested functions. """
@@ -95,7 +95,47 @@ class TestFormulaParser:
         parser = Parser(formula)
         parsed = parser.to_dict()
         key_counts = Parser.get_all_keys_with_counts(parsed)
+
         expected_counts = {
             'function': 2, 'arguments': 2, 'reference': 3
         }
         assert key_counts == expected_counts, "Counts of keys should match expected values"
+
+        key_counts = Parser.get_all_keys_with_counts(parsed, label="function")
+        expected_counts = {
+            'function': 2
+        }
+        assert key_counts == expected_counts, "Counts of keys should match expected values"
+
+    def test_formula_translation(self):
+        """ Test translation of cell references within a formula. """
+        formula = "=SUM(A1, B2)"
+        parser = Parser(formula)
+        parser.translate('A1', 'C3')  # Example: Translate all references as if 'A1' moved to 'C3'
+        expected_output = {
+            "function": "SUM(C3, D4)",
+            "components": {
+                "name": "SUM",
+                "arguments": [
+                    {
+                        'reference': 'C3', 
+                        'components': {
+                            'column_letter': 'C', 
+                            'row_number': 3,
+                            'sheet_name': None,
+                            'column_number': 3
+                        }
+                    },
+                    {
+                        'reference': 'D4', 
+                        'components': {
+                            'column_letter': 'D', 
+                            'row_number': 4,
+                            'sheet_name': None,
+                            'column_number': 4
+                        }
+                    }
+                ]
+            }
+        }
+        assert parser.to_dict() == expected_output, "Translation should correctly adjust cell references"

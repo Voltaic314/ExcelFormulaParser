@@ -1,9 +1,41 @@
 import re 
+from Models.model_types import Types
 
 
 class Expression:
     operators = ['+', '-', '*', '/', '>', '<', '>=', '<=', '=', '<>']
     operator_pattern = '|'.join(re.escape(op) for op in operators)  # Create a regex pattern for splitting
+
+    @staticmethod
+    def from_dict(expr_dict):
+        """Constructs an Expression object from its dictionary representation."""
+        def reconstruct_expression(components):
+            parts = []
+            for component in components:
+                if isinstance(component, dict):
+                    # Recursively handle nested expressions
+                    if 'expression' in component:
+                        nested_expr = reconstruct_expression(component['expression'])
+                        parts.append(f"({nested_expr})")
+                    elif 'operator' in component:
+                        parts.append(component['operator'])
+                    elif 'constant' in component:
+                        parts.append(str(component['constant']))
+                    else:
+                        type_str = [item for item in component.keys() if item not in ['components']][0]
+                        obj_type = Types(type_str).get_type()
+                        instance = obj_type.from_dict(component)
+                        parts.append(str(instance))
+                else:
+                    parts.append(str(component))
+            return ' '.join(parts)
+
+        if 'components' in expr_dict:
+            expression_string = reconstruct_expression(expr_dict['components'])
+        else:
+            raise ValueError("Invalid dictionary format for constructing an Expression.")
+
+        return Expression(expression_string)
 
     def __init__(self, expression):
         self.original_expression = expression.strip()
@@ -98,7 +130,17 @@ class Expression:
         return parsed_expr
 
     def __str__(self):
-        return str(self.original_expression)
+        def build_expression_string(components):
+            expr_str = []
+            for component in components:
+                if isinstance(component, dict):
+                    if 'expression' in component:
+                        expr_str.append('(' + build_expression_string(component['expression']) + ')')
+                elif isinstance(component, str):
+                    expr_str.append(component)
+            return ' '.join(expr_str)
+
+        return build_expression_string(self.expression)
 
     def to_dict(self):
         return {"expression": str(self), 
