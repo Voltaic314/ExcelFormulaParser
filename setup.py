@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="ExcelFormulaParser",
-    version="1.0.0",
+    version="1.0.1",
     packages=find_packages(where="src"),  # Tells setuptools to package any Python packages found in src
     package_dir={"": "src"},  # Tells setuptools that the packages are under src directory
     author="Voltaic314",
