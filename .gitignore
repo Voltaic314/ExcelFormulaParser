@@ -153,3 +153,4 @@ cython_debug/
 
 # ignoring all virtual environment related stuff
 venv
+pypi EFP Token .txt
