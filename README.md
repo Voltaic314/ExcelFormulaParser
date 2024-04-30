@@ -37,7 +37,8 @@ The project is in active development, aiming for significant functionality compl
 
 ### Current Work
 
-    Developing features to provide analytical insights into formula components.
+    - Developing features to provide analytical insights into formula components.
+    - Need to work on implementing absolute cell reference support into our structure. Shouldn't be too hard but will take time as everything relies on this class. 
 
 
 ## installation 
